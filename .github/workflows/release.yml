@@ -1,15 +1,27 @@
-# Release flow (manual):
+# Release flow:
 #   1. Bump `uxcamKmp` in gradle/libs.versions.toml on main.
-#   2. Run this workflow with the same version.
-#      It builds UXCamKMP.xcframework.zip, stamps Package.swift (version + checksum),
-#      commits + tags, and creates a DRAFT GitHub release carrying the zip.
-#   3. Review the draft (exactly one asset, checksum matches) and publish it.
-#   4. If MAVEN_PUBLISH_ENABLED == 'true', artifacts also stage to the Central Portal —
-#      finish that release in the Portal UI (central.sonatype.com).
+#   2. Run this workflow with the same version. It builds UXCamKMP.xcframework.zip, stamps
+#      Package.swift (version + checksum), commits + tags, creates a GitHub release carrying
+#      the zip, then stages every Maven artifact into one bundle and uploads it to the
+#      Central Portal.
+#
+# Whether step 2 finishes the release depends on MAVEN_CENTRAL_AUTO_PUBLISH:
+#
+#   false (default) — Central deployment is USER_MANAGED and the GitHub release stays a
+#                     DRAFT. Review both, then publish the draft and press Publish at
+#                     central.sonatype.com/publishing/deployments. Nothing is permanent
+#                     until you do; a deployment can be dropped instead.
+#   true            — Central deployment is AUTOMATIC (released once validation passes) and
+#                     the GitHub release is published automatically. Fully hands-off, and
+#                     Maven Central is irreversible once released.
+#
+# Re-running: pass publish_only=true to retry the Maven Central half against an existing
+# tag and release, without rebuilding or re-tagging.
 #
 # Secrets: SIGNING_KEY, SIGNING_PASSWORD, OSSRH_USERNAME, OSSRH_PASSWORD (Central Portal
-# tokens; see build-logic/src/main/kotlin/uxcam-publishing.gradle.kts), optional
-# SLACK_WEBHOOK_URL. Variables: MAVEN_PUBLISH_ENABLED.
+# user token; see build-logic/src/main/kotlin/uxcam-publishing.gradle.kts), optional
+# SLACK_WEBHOOK_URL.
+# Variables: MAVEN_PUBLISH_ENABLED (gates the Central half), MAVEN_CENTRAL_AUTO_PUBLISH.
 
 name: Release
 
@@ -146,20 +158,38 @@ jobs:
                     -p gradle-plugin publishAllPublicationsToCentralStagingRepository
           scripts/publish-central.sh "${{ inputs.version }}" "$STAGING"
 
+      - name: Publish the GitHub release
+        if: vars.MAVEN_CENTRAL_AUTO_PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Auto-publish means the whole release is automated, not just the Central half —
+          # otherwise the GitHub release would sit as a draft while the artifacts are live.
+          if [[ "$(gh release view "$VERSION" --json isDraft --jq .isDraft)" == "true" ]]; then
+            gh release edit "$VERSION" --draft=false --latest
+            echo "Published GitHub release $VERSION"
+          else
+            echo "GitHub release $VERSION is already published."
+          fi
+
       - name: Notify Slack
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           VERSION: ${{ inputs.version }}
           RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}
+          AUTO_PUBLISH: ${{ vars.MAVEN_CENTRAL_AUTO_PUBLISH || 'false' }}
         run: |
           if [[ -z "$SLACK_WEBHOOK_URL" ]]; then
             echo "SLACK_WEBHOOK_URL is not configured; notification skipped."
             exit 0
           fi
-          jq -n \
-            --arg version "$VERSION" \
-            --arg url "$RELEASE_URL" \
-            '{text: (":rocket: UXCam KMP SDK " + $version + " draft release is ready — review and publish: " + $url)}' \
+          if [[ "$AUTO_PUBLISH" == "true" ]]; then
+            text=":rocket: UXCam KMP SDK $VERSION released — live on Maven Central and GitHub: $RELEASE_URL"
+          else
+            text=":package: UXCam KMP SDK $VERSION is staged and awaiting review — publish the GitHub draft ($RELEASE_URL) and the Central deployment (https://central.sonatype.com/publishing/deployments)"
+          fi
+          jq -n --arg text "$text" '{text: $text}' \
             | curl --fail-with-body --retry 3 \
                 -H 'Content-Type: application/json' \
                 --data-binary @- \
