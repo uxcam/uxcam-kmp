@@ -137,6 +137,27 @@ jobs:
           ./gradlew --no-configuration-cache \
                     -p gradle-plugin publishAllPublicationsToCentralRepository
 
+      - name: Promote staged artifacts to a Portal deployment
+        if: vars.MAVEN_PUBLISH_ENABLED == 'true'
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+        run: |
+          # Gradle's maven-publish only PUTs artifacts into the OSSRH compatibility shim; they
+          # are not a Portal deployment until promoted. The shim keys each "default repository"
+          # by the CALLER'S IP, so this must run from the same runner that uploaded — it cannot
+          # be done afterwards from a laptop. publishing_type=user_managed leaves the resulting
+          # deployment VALIDATED and awaiting a human Publish in the Portal.
+          code="$(curl -sS -o "$RUNNER_TEMP/promote.json" -w '%{http_code}' \
+            -X POST -u "$OSSRH_USERNAME:$OSSRH_PASSWORD" \
+            "https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/com.uxcam?publishing_type=user_managed")"
+          echo "HTTP $code"; cat "$RUNNER_TEMP/promote.json" 2>/dev/null; echo
+          if [[ "$code" != "200" ]]; then
+            echo "::error::Promotion to a Portal deployment failed with HTTP $code"
+            exit 1
+          fi
+          echo "Staged. Review and publish at https://central.sonatype.com/publishing/deployments"
+
       - name: Notify Slack
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
