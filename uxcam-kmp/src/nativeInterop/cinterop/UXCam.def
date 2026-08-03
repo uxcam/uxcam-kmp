@@ -1,0 +1,3 @@
+language = Objective-C
+package = com.uxcam.kmp.cinterop
+modules = UXCam

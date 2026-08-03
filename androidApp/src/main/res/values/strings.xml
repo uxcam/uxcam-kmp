@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UXCam KMP Sample</string>
+    <string name="uxcam_app_key">YOUR_UXCAM_APP_KEY</string>
+</resources>

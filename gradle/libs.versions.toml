@@ -1,0 +1,49 @@
+[versions]
+agp = "8.7.3"
+kotlin = "2.4.0"
+androidCompileSdk = "35"
+androidMinSdk = "24"
+androidTargetSdk = "35"
+
+# Single source of truth — the published uxcam-kmp version and the native UXCam SDK versions.
+# Consumed by the library build, and code-generated into the Gradle plugin (see gradle-plugin/build.gradle.kts).
+uxcamKmp = "1.0.0"
+uxcamAndroid = "3.10.7"
+uxcamIos = "3.10.0"
+# SHA-256 of UXCam.xcframework.zip for uxcamIos — verified at download time (see uxcam-kmp/build.gradle.kts).
+# Matches the checksum upstream declares in uxcam-ios/Package.swift for the same release asset.
+uxcamIosChecksum = "492517f73765d2ba2ef59712a3310bb8824a6cc503b9af19050a14c2b1902dca"
+
+coreKtx = "1.13.1"
+lifecycle = "2.8.7"
+activityCompose = "1.9.3"
+navigationCompose = "2.8.9"
+composeBom = "2024.12.01"
+# Compose Multiplatform runtime/ui artifacts used by :uxcam-compose (Modifier.uxcamOcclude).
+# The compose *compiler* comes bundled with Kotlin (org.jetbrains.kotlin.plugin.compose).
+composeMultiplatform = "1.9.3"
+
+[libraries]
+uxcam-android = { module = "com.uxcam:uxcam", version.ref = "uxcamAndroid" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
+
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

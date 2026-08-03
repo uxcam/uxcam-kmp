@@ -1,0 +1,68 @@
+# Scratch xcodegen spec: the shipping app target plus an XCUITest target that drives the
+# sample through the shared-API scenarios. Kept separate from project.yml so the repo's
+# project generation is unchanged. Generate with:
+#   xcodegen generate --spec project-e2e.yml
+name: iosApp-e2e
+options:
+  bundleIdPrefix: com.uxcam.kmp
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  UXCam:
+    url: https://github.com/uxcam/uxcam-ios
+    exactVersion: 3.10.0
+
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: iosApp
+    info:
+      path: iosApp/Info.plist
+      properties:
+        CFBundleDisplayName: UXCam KMP
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.uxcam.kmp.sample.ios
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: "NO"
+    dependencies:
+      - framework: ../examples/shared/build/XCFrameworks/release/Shared.xcframework
+        embed: false
+      - package: UXCam
+
+  e2eTests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: e2eTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.uxcam.kmp.sample.ios.e2eTests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: iosApp
+    dependencies:
+      - target: iosApp
+
+schemes:
+  iosApp-e2e:
+    build:
+      targets:
+        iosApp: all
+        e2eTests: [test]
+    test:
+      config: Debug
+      targets:
+        - e2eTests
