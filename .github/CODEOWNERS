@@ -1,0 +1,6 @@
+/Package.swift                  @uxcam/maintainers
+/gradle/libs.versions.toml      @uxcam/maintainers
+/build-logic/                   @uxcam/maintainers
+/scripts/                       @uxcam/maintainers
+/.github/                       @uxcam/maintainers @uxcam/security-team
+/.github/workflows/             @uxcam/maintainers @uxcam/security-team

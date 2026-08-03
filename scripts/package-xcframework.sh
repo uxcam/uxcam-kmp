@@ -28,13 +28,14 @@ cat <<EOF
   Artifact : $ROOT/$ZIP
   Checksum : $CHECKSUM
 
-  Upload the zip to a GitHub release, then in Package.swift replace
-  the local binary target with:
+  Releases are normally cut by .github/workflows/release.yml, which
+  rebuilds this zip, uploads it as the GitHub release asset, and
+  stamps Package.swift's \`version\` + \`checksum\` to match.
 
-    .binaryTarget(
-        name: "UXCamKMPBinary",
-        url: "https://github.com/uxcam/uxcam-kmp/releases/download/<version>/UXCamKMP.xcframework.zip",
-        checksum: "$CHECKSUM"
-    )
+  For a manual/emergency release, upload the zip to the GitHub
+  release for <version> and set in Package.swift:
+
+    let version = "<version>"
+    let checksum = "$CHECKSUM"
 ==================================================================
 EOF

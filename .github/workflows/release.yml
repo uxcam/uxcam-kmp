@@ -1,0 +1,141 @@
+# Release flow (manual):
+#   1. Bump `uxcamKmp` in gradle/libs.versions.toml on main.
+#   2. Run this workflow with the same version.
+#      It builds UXCamKMP.xcframework.zip, stamps Package.swift (version + checksum),
+#      commits + tags, and creates a DRAFT GitHub release carrying the zip.
+#   3. Review the draft (exactly one asset, checksum matches) and publish it.
+#   4. If MAVEN_PUBLISH_ENABLED == 'true', artifacts also stage to the Central Portal —
+#      finish that release in the Portal UI (central.sonatype.com).
+#
+# Secrets: SIGNING_KEY, SIGNING_PASSWORD, OSSRH_USERNAME, OSSRH_PASSWORD (Central Portal
+# tokens; see build-logic/src/main/kotlin/uxcam-publishing.gradle.kts), optional
+# SLACK_WEBHOOK_URL. Variables: MAVEN_PUBLISH_ENABLED.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (must match uxcamKmp in gradle/libs.versions.toml)"
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, tag, and draft release
+    runs-on: macos-15
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 1
+          # This job pushes the stamped Package.swift commit and the release tag.
+          persist-credentials: true
+
+      - name: Validate version input
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version must be x.y.z, got '$VERSION'"
+            exit 1
+          fi
+          catalog="$(sed -n 's/^uxcamKmp = "\([^"]*\)".*$/\1/p' gradle/libs.versions.toml)"
+          if [[ "$catalog" != "$VERSION" ]]; then
+            echo "::error::uxcamKmp in libs.versions.toml is '$catalog', expected '$VERSION' — bump the catalog first"
+            exit 1
+          fi
+          if git ls-remote --exit-code origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag $VERSION already exists — existing tags are never changed"
+            exit 1
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build UXCamKMP.xcframework.zip
+        run: |
+          ./gradlew :uxcam-kmp:assembleUXCamKMPXCFramework
+          out="uxcam-kmp/build/XCFrameworks/release"
+          (cd "$out" && zip -qry UXCamKMP.xcframework.zip UXCamKMP.xcframework)
+          cp "$out/UXCamKMP.xcframework.zip" "$RUNNER_TEMP/UXCamKMP.xcframework.zip"
+
+      - name: Stamp Package.swift
+        id: stamp
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          checksum="$(swift package compute-checksum "$RUNNER_TEMP/UXCamKMP.xcframework.zip")"
+          sed -i '' "s/^let version = \".*\"$/let version = \"$VERSION\"/" Package.swift
+          sed -i '' "s/^let checksum = \".*\"$/let checksum = \"$checksum\"/" Package.swift
+          swift package dump-package >/dev/null
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, tag, and push
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "uxcam-release-bot"
+          git config user.email "mobile@uxcam.com"
+          git add Package.swift
+          git commit -m "Release $VERSION"
+          git tag "$VERSION"
+          git push origin HEAD:main "refs/tags/$VERSION"
+
+      - name: Create draft GitHub release with the asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "$VERSION" \
+            "$RUNNER_TEMP/UXCamKMP.xcframework.zip" \
+            --draft \
+            --title "$VERSION" \
+            --generate-notes
+
+      - name: Publish to Maven Central (staging)
+        if: vars.MAVEN_PUBLISH_ENABLED == 'true'
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+        run: |
+          if [[ -z "$SIGNING_KEY" || -z "$OSSRH_USERNAME" ]]; then
+            echo "::error::Maven publishing is enabled but SIGNING_KEY/OSSRH_USERNAME secrets are missing"
+            exit 1
+          fi
+          ./gradlew :uxcam-kmp:publishAllPublicationsToCentralRepository \
+                    :uxcam-compose:publishAllPublicationsToCentralRepository
+          ./gradlew -p gradle-plugin publishAllPublicationsToCentralRepository
+
+      - name: Notify Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}
+        run: |
+          if [[ -z "$SLACK_WEBHOOK_URL" ]]; then
+            echo "SLACK_WEBHOOK_URL is not configured; notification skipped."
+            exit 0
+          fi
+          jq -n \
+            --arg version "$VERSION" \
+            --arg url "$RELEASE_URL" \
+            '{text: (":rocket: UXCam KMP SDK " + $version + " draft release is ready — review and publish: " + $url)}' \
+            | curl --fail-with-body --retry 3 \
+                -H 'Content-Type: application/json' \
+                --data-binary @- \
+                "$SLACK_WEBHOOK_URL"
