@@ -59,10 +59,15 @@ if [[ -n "$missing_sigs" ]]; then
 fi
 
 # Every staged artifact must carry the version being released; a stale staging directory
-# would otherwise silently ship the wrong bits.
-if find "$STAGING/com/uxcam" -mindepth 2 -maxdepth 2 -type d ! -name "$VERSION" | grep -q .; then
-  echo "error: $STAGING contains versions other than $VERSION:" >&2
-  find "$STAGING/com/uxcam" -mindepth 2 -maxdepth 2 -type d ! -name "$VERSION" >&2
+# would otherwise silently ship the wrong bits. Derive version directories from where the
+# .pom files actually are rather than assuming a fixed depth — the Gradle plugin marker
+# publishes under group com.uxcam.kmp, so it sits one level deeper than the other modules.
+stale="$(find "$STAGING/com/uxcam" -name '*.pom' -exec dirname {} \; | sort -u | while IFS= read -r dir; do
+    [[ "$(basename "$dir")" == "$VERSION" ]] || echo "$dir"
+  done)"
+if [[ -n "$stale" ]]; then
+  echo "error: $STAGING contains artifacts for a version other than $VERSION:" >&2
+  echo "$stale" >&2
   echo "       clean the staging directory and re-stage" >&2
   exit 1
 fi
