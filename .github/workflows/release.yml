@@ -19,6 +19,10 @@ on:
       version:
         description: "Release version (must match uxcamKmp in gradle/libs.versions.toml)"
         required: true
+      publish_only:
+        description: "Retry Maven Central publishing only (tag and GitHub release already exist)"
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -55,7 +59,13 @@ jobs:
             exit 1
           fi
           if git ls-remote --exit-code origin "refs/tags/$VERSION" >/dev/null 2>&1; then
-            echo "::error::Tag $VERSION already exists — existing tags are never changed"
+            if [[ "${{ inputs.publish_only }}" != "true" ]]; then
+              echo "::error::Tag $VERSION already exists — existing tags are never changed. Re-run with publish_only to retry Maven Central."
+              exit 1
+            fi
+            echo "Tag $VERSION exists; publish_only run — reusing it and skipping build/tag/release."
+          elif [[ "${{ inputs.publish_only }}" == "true" ]]; then
+            echo "::error::publish_only was requested but tag $VERSION does not exist"
             exit 1
           fi
 
@@ -66,6 +76,7 @@ jobs:
           java-version: "17"
 
       - name: Build UXCamKMP.xcframework.zip
+        if: inputs.publish_only != true
         run: |
           ./gradlew :uxcam-kmp:assembleUXCamKMPXCFramework
           out="uxcam-kmp/build/XCFrameworks/release"
@@ -73,6 +84,7 @@ jobs:
           cp "$out/UXCamKMP.xcframework.zip" "$RUNNER_TEMP/UXCamKMP.xcframework.zip"
 
       - name: Stamp Package.swift
+        if: inputs.publish_only != true
         id: stamp
         env:
           VERSION: ${{ inputs.version }}
@@ -84,6 +96,7 @@ jobs:
           echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
 
       - name: Commit, tag, and push
+        if: inputs.publish_only != true
         env:
           VERSION: ${{ inputs.version }}
         run: |
@@ -95,6 +108,7 @@ jobs:
           git push origin HEAD:main "refs/tags/$VERSION"
 
       - name: Create draft GitHub release with the asset
+        if: inputs.publish_only != true
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
@@ -117,9 +131,11 @@ jobs:
             echo "::error::Maven publishing is enabled but SIGNING_KEY/OSSRH_USERNAME secrets are missing"
             exit 1
           fi
-          ./gradlew :uxcam-kmp:publishAllPublicationsToCentralRepository \
+          ./gradlew --no-configuration-cache \
+                    :uxcam-kmp:publishAllPublicationsToCentralRepository \
                     :uxcam-compose:publishAllPublicationsToCentralRepository
-          ./gradlew -p gradle-plugin publishAllPublicationsToCentralRepository
+          ./gradlew --no-configuration-cache \
+                    -p gradle-plugin publishAllPublicationsToCentralRepository
 
       - name: Notify Slack
         env:
