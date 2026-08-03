@@ -6,8 +6,8 @@ import PackageDescription
 // both values so the tagged manifest matches the exact asset. Do not edit them by hand.
 // Until the first release is published this URL does not resolve — build from source
 // instead (scripts/build-ios.sh) or use scripts/package-xcframework.sh for a local zip.
-let version = "0.0.0-unreleased"
-let checksum = "0000000000000000000000000000000000000000000000000000000000000000"
+let version = "0.0.1"
+let checksum = "ace77ffccdfd5bd7a34d729b835871c5e101e2450d87ff350e9ca23eeca5b3c9"
 
 let package = Package(
     name: "UXCamKMP",
