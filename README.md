@@ -146,6 +146,30 @@ iosApp/           iOS (SwiftUI) sample
 
 Set your UXCam app key in the sample sources before running.
 
+## Releasing
+
+Create a release branch from the current `main` commit and push it:
+
+```bash
+git switch main
+git pull --ff-only
+git switch -c release/0.1.0
+git push -u origin release/0.1.0
+```
+
+The **Prepare release branch** workflow derives `0.1.0` from the branch name, validates that it is
+newer than the current version, and commits the manifest changes. After that workflow succeeds,
+open the link in its job summary or create the review PR with:
+
+```bash
+gh pr create --base main --head release/0.1.0 --title "Release 0.1.0" --fill
+```
+
+Do not bump `uxcamKmp`, edit `Package.swift`, or create the release tag manually. Merging the
+reviewed PR automatically builds and checksums the XCFramework, creates the final immutable
+`v0.1.0` tag and GitHub release, and publishes the Maven Central artifacts. A manual **Release**
+workflow dispatch is reserved for retrying publication of an existing final version.
+
 ## Requirements
 
 - JDK 17 and the Android SDK (compileSdk 35)
