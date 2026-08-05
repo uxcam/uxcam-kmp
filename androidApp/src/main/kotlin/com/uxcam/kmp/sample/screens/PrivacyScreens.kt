@@ -33,7 +33,6 @@ import com.uxcam.kmp.uxcamOcclude
 @Composable
 fun PrivacyScreen(navController: NavHostController) {
     var hideScreen by remember { mutableStateOf(false) }
-    var occludeFields by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
     var sensitiveView by remember { mutableStateOf<TextView?>(null) }
 
@@ -47,11 +46,6 @@ fun PrivacyScreen(navController: NavHostController) {
             Action("occludeSensitiveScreen(true, withoutGesture = true)") {
                 UXCamKMP.occludeSensitiveScreen(true, withoutGesture = true)
                 SampleLog.add("occludeSensitiveScreen(true, withoutGesture = true)")
-            }
-            ToggleRow("occludeAllTextFields", occludeFields) {
-                occludeFields = it
-                UXCamKMP.occludeAllTextFields(it)
-                SampleLog.add("occludeAllTextFields($it)")
             }
         }
 
@@ -161,7 +155,7 @@ fun PrivacyScreen(navController: NavHostController) {
     }
 }
 
-/** A form where `occludeAllTextFields` and per-field occlusion can be compared side by side. */
+/** A form demonstrating explicit per-field occlusion. */
 @Composable
 fun SensitiveFormScreen() {
     var name by remember { mutableStateOf("Ada Lovelace") }
@@ -170,8 +164,7 @@ fun SensitiveFormScreen() {
 
     ScreenScaffold {
         Text(
-            "The SSN field is occluded per-composable; the others are only hidden when " +
-                "occludeAllTextFields is on.",
+            "The SSN field is occluded per-composable; the other fields remain visible.",
             style = MaterialTheme.typography.bodyMedium,
         )
 

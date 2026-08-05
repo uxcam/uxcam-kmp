@@ -56,7 +56,6 @@ actual object UXCamKMP {
     // --- Occlusion (screen-level) ---
     actual fun occludeSensitiveScreen(hideScreen: Boolean) {}
     actual fun occludeSensitiveScreen(hideScreen: Boolean, withoutGesture: Boolean) {}
-    actual fun occludeAllTextFields(occludeAll: Boolean) {}
     actual fun applyOverlayOcclusion(overlayOcclusion: KMPUXCamOverlay) {}
     actual fun applyBlurOcclusion(blurOcclusion: KMPUXCamBlur) {}
     actual fun removeOcclusion() {}
