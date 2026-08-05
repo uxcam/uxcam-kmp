@@ -6,8 +6,8 @@ import PackageDescription
 // both values so the tagged manifest matches the exact asset. Do not edit them by hand.
 // On main the version stays at this unreleased placeholder. The release workflow stamps the
 // real version and checksum into the immutable release-tag commit.
-let version = "0.0.0-unreleased"
-let checksum = "ace77ffccdfd5bd7a34d729b835871c5e101e2450d87ff350e9ca23eeca5b3c9"
+let version = "1.0.0"
+let checksum = "5c17c5189b14931877ed75b5842917b27ceb9ef437c9a7edd544c7f6d3526e81"
 
 let package = Package(
     name: "UXCamKMP",
