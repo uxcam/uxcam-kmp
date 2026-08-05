@@ -1,18 +1,11 @@
-# uxcam-kmp
+# UXCam Kotlin Multiplatform
 
-A Kotlin Multiplatform library for [UXCam](https://uxcam.com) — session recording and product
-analytics through a single shared Kotlin API that delegates to the native UXCam SDK on each platform.
+UXCam session recording and product analytics for Kotlin Multiplatform applications. The shared
+Kotlin API uses the native UXCam SDK on Android and iOS.
 
-| Platform | Native SDK | Delivered via |
-|----------|------------|---------------|
-| Android  | `com.uxcam:uxcam` | Maven Central |
-| iOS      | `uxcam-ios`   | Swift Package Manager or CocoaPods |
+## Install
 
-## Installation
-
-### Kotlin Multiplatform
-
-Apply the Gradle plugin to your shared module:
+Apply the UXCam plugin to your shared module:
 
 ```kotlin
 plugins {
@@ -20,58 +13,44 @@ plugins {
 }
 ```
 
-The plugin adds the `uxcam-kmp` dependency to `commonMain` (and `uxcam-compose` when a Compose
-plugin is detected). As with any multi-module KMP + Android project, declare the Kotlin and
-Android plugins once in the root build script with `apply false` — without that, sibling modules
-load the Kotlin plugin in separate classloaders and Kotlin/Native task creation fails with a
-"shared build service" error. Android resolves its native SDK transitively. On iOS, link the native UXCam
-SDK once at the app boundary through SwiftPM or CocoaPods:
+The plugin adds `uxcam-kmp` to `commonMain` and adds `uxcam-compose` when Compose is detected.
+Android receives the native UXCam SDK transitively.
 
-| Your iOS setup | What the plugin does | Extra steps |
-|---|---|---|
-| Default template (embed-and-sign, static framework) | Leaves native UXCam symbols for the final Xcode app link | Add `https://github.com/uxcam/uxcam-ios` to the iOS app |
-| Dynamic Kotlin framework | Not recommended with a separately linked static native SDK because it can duplicate UXCam classes | Use a static Kotlin framework |
-| CocoaPods (`kotlin("native.cocoapods")`) | Adds `pod("UXCam")` (link-only), floors the deployment target, adds Swift-compat search paths, and warns if a dynamic framework would duplicate the SDK | **None** — just run `pod install` as usual |
-| SwiftPM (`uxcam-ios` package added in Xcode) | Xcode supplies the native SDK, linker settings, and privacy manifest at the final app link | **None** beyond having added the package |
+For multi-module projects, declare the Kotlin and Android plugins once in the root build with
+`apply false`.
 
-On Android the native `com.uxcam:uxcam` SDK arrives transitively through Gradle — nothing to do.
-The plugin also fails fast with an actionable message when the consumer's Kotlin version is too
-old for the published klib, warns when the Kotlin plugin is loaded by multiple classloaders (the
-missing root `apply false` mistake), reminds you about the Xcode-side SwiftPM link, and skips iOS
-work on non-Mac hosts. It does not download, merge, or rewrite Apple frameworks.
+### Link the iOS SDK
 
-Its knobs (all optional, set via `uxcamKmp { ... }`):
+The native UXCam iOS SDK must be linked by the final iOS application:
 
-| Knob | Default | Purpose |
-|---|---|---|
-| `verifyKotlinVersion` | `true` | Fail fast on a too-old consumer Kotlin |
-| `installComposeHelpers` | `true` | Auto-add `uxcam-compose` when a Compose plugin is detected |
-| `exportToIosFrameworks` | `false` | Export `UXCamKMP` into your framework so Swift can call it directly (instead of through your own shared facade) |
-| `iosLinkReminder` | `true` | Log the SwiftPM app-link reminder for iOS builds without CocoaPods |
-| `libraryVersion` | plugin's own | Override the installed library version (hotfixes) |
+- **Swift Package Manager:** add `https://github.com/uxcam/uxcam-ios` in Xcode and use a static
+  Kotlin framework.
+- **CocoaPods:** when the shared module uses `kotlin("native.cocoapods")`, the UXCam plugin adds
+  the native pod automatically.
 
-Prefer manual control? Depend on the library directly (you then own the iOS linking):
+### Install without the Gradle plugin
+
+You can add the shared library directly, but must configure iOS linking yourself:
 
 ```kotlin
-dependencies {
-    implementation("com.uxcam:uxcam-kmp:<version>")
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.uxcam:uxcam-kmp:<version>")
+        }
+    }
 }
 ```
 
-Both supported iOS paths let Xcode process UXCam's `PrivacyInfo.xcprivacy`.
+### Native iOS application
 
-### iOS (native app)
+Add the prebuilt package in Xcode, then `import UXCamKMP`:
 
-Add the Swift package, then `import UXCamKMP`:
-
-```
+```text
 https://github.com/uxcam/uxcam-kmp
 ```
 
-The package contains the prebuilt KMP XCFramework and pins the native `uxcam-ios` version used
-to generate its Objective-C bindings.
-
-## Usage
+## Start UXCam
 
 ```kotlin
 import com.uxcam.kmp.KMPUXCamBlur
@@ -80,98 +59,47 @@ import com.uxcam.kmp.uxcamConfiguration
 
 UXCamKMP.startWithConfiguration(
     uxcamConfiguration("YOUR_UXCAM_APP_KEY") {
-        enableAutomaticScreenNameTagging = true
         enableCrashHandling = true
-        occlusions = listOf(KMPUXCamBlur(screens = listOf("PaymentScreen")))
-    }
+        occlusions = listOf(
+            KMPUXCamBlur(screens = listOf("PaymentScreen")),
+        )
+    },
 )
 
 UXCamKMP.tagScreenName("Home")
 UXCamKMP.logEvent("checkout_started", mapOf("cart_size" to 3))
 UXCamKMP.setUserIdentity("user-42")
-UXCamKMP.setSessionProperty("ab_bucket", "checkout_v2")
-UXCamKMP.reportBugEvent("payment_declined", mapOf("code" to 402))
-UXCamKMP.occludeAllTextFields(true)
 ```
 
-The common API covers the native surface shared by Android and iOS: session lifecycle, screen
-tagging + ignore lists,
-event logging (map/JSON), bug & exception reporting, user and session properties, structured
-occlusion (overlay/blur, per-screen rules), recording control incl. short breaks, opt-in/out
-(overall + video), verification listeners, pending-upload management, and dashboard URLs.
-Android-only APIs are Android source-set extensions, so unsupported calls cannot silently compile
-and do nothing on iOS.
+Screen names must be tagged explicitly with `tagScreenName`.
 
-Runtime occlusion is additive on both platforms: `applyBlurOcclusion`/`applyOverlayOcclusion`
-stack on top of rules already active, and `removeOcclusion()` clears them all. One iOS caveat:
-rules applied *before* `startWithConfiguration` are folded into the startup configuration (the
-only point where the native iOS SDK honours `excludeMentionedScreens`), and the native SDK
-cannot remove configuration-based occlusion at runtime — pass short-lived rules after start
-instead.
+The shared API also supports session control, user and session properties, screen-name ignore
+lists, bug and exception reporting, privacy occlusion, recording controls, consent management,
+verification callbacks, upload status, and dashboard URLs.
 
-Besides Android and iOS, the library ships no-op binaries for `jvm`, `js`, `wasmJs`,
-`linuxX64`, and `mingwX64`, so multi-target shared modules resolve it from `commonMain`
-without platform guards.
+## Compose occlusion
 
-### Compose Multiplatform occlusion
-
-Compose renders into a single native view, so per-View occlusion can't see individual
-composables. The `uxcam-compose` module (auto-installed for Compose consumers) provides:
+For Compose Multiplatform, apply `uxcamOcclude` to sensitive content:
 
 ```kotlin
-Text("secret", modifier = Modifier.uxcamOcclude("payment-card"))
+Text(
+    text = "Sensitive content",
+    modifier = Modifier.uxcamOcclude("payment-card"),
+)
 ```
 
-On Android the complete set of live node bounds is sent through the SDK's public frame-scoped
-occlusion API; on iOS it is forwarded through the SDK's identity-based rect occlusion API.
+Startup occlusion rules are configured through `uxcamConfiguration`. Runtime blur and overlay
+rules are additive until `UXCamKMP.removeOcclusion()` is called.
 
-## Project structure
+## Supported platforms
 
-```
-uxcam-kmp/        Kotlin Multiplatform library (Android + iOS + no-op targets)
-uxcam-compose/    Modifier.uxcamOcclude for Compose Multiplatform
-gradle-plugin/    the com.uxcam.kmp Gradle plugin
-build-logic/      shared publishing convention (Maven Central Portal)
-androidApp/       Android (Jetpack Compose) sample
-examples/shared/  shared KMP module sample
-iosApp/           iOS (SwiftUI) sample
-```
-
-## Building from source
-
-```bash
-./gradlew :androidApp:assembleDebug     # Android sample
-./scripts/build-ios.sh                  # iOS sample (builds the XCFramework, then the app)
-```
-
-Set your UXCam app key in the sample sources before running.
-
-## Releasing
-
-Create a release branch from the current `main` commit and push it:
-
-```bash
-git switch main
-git pull --ff-only
-git switch -c release/0.1.0
-git push -u origin release/0.1.0
-```
-
-The **Prepare release branch** workflow derives `0.1.0` from the branch name, validates that it is
-newer than the current version, and commits the manifest changes. After that workflow succeeds,
-open the link in its job summary or create the review PR with:
-
-```bash
-gh pr create --base main --head release/0.1.0 --title "Release 0.1.0" --fill
-```
-
-Do not bump `uxcamKmp`, edit `Package.swift`, or create the release tag manually. Merging the
-reviewed PR automatically builds and checksums the XCFramework, creates the final immutable
-`v0.1.0` tag and GitHub release, and publishes the Maven Central artifacts. A manual **Release**
-workflow dispatch is reserved for retrying publication of an existing final version.
+- Android 24+
+- iOS 15+
+- No-op targets for JVM, JavaScript, WebAssembly, Linux, and Windows
 
 ## Requirements
 
-- JDK 17 and the Android SDK (compileSdk 35)
-- Kotlin 2.4.0, iOS 15+, and Xcode 26+
-- `xcodegen` (for the iOS sample project)
+- Kotlin 2.4.0+
+- JDK 17
+- Android compile SDK 35+
+- Xcode 26+
