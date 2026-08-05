@@ -1,22 +1,15 @@
 # Release flow:
-#   1. Bump `uxcamKmp` in gradle/libs.versions.toml on main.
-#   2. Run this workflow with the same version. It builds UXCamKMP.xcframework.zip, stamps
-#      Package.swift (version + checksum), commits + tags, creates a GitHub release carrying
-#      the zip, then stages every Maven artifact into one bundle and uploads it to the
-#      Central Portal.
+#   1. Create `release/<x.y.z>` from main and push it. prepare-release.yml validates the branch,
+#      bumps uxcamKmp, and leaves the branch ready for a manually reviewed PR.
+#   2. Merge that PR into main. This workflow builds UXCamKMP.xcframework.zip, stamps the exact
+#      version + checksum into Package.swift on a release-only commit, creates the immutable
+#      `v<x.y.z>` tag, and publishes the GitHub and Maven Central releases.
 #
-# Whether step 2 finishes the release depends on MAVEN_CENTRAL_AUTO_PUBLISH:
+# The release-only commit is deliberately tagged without being pushed to main. Package.swift on
+# main stays at 0.0.0-unreleased; each published tag contains the exact asset URL and checksum.
 #
-#   false (default) — Central deployment is USER_MANAGED and the GitHub release stays a
-#                     DRAFT. Review both, then publish the draft and press Publish at
-#                     central.sonatype.com/publishing/deployments. Nothing is permanent
-#                     until you do; a deployment can be dropped instead.
-#   true            — Central deployment is AUTOMATIC (released once validation passes) and
-#                     the GitHub release is published automatically. Fully hands-off, and
-#                     Maven Central is irreversible once released.
-#
-# Re-running: pass publish_only=true to retry the Maven Central half against an existing
-# tag and release, without rebuilding or re-tagging.
+# Manual dispatch is recovery-only: provide an existing version to retry Maven Central and finish
+# publishing an existing draft GitHub release without rebuilding or moving its tag.
 #
 # Secrets: SIGNING_KEY, SIGNING_PASSWORD, OSSRH_USERNAME, OSSRH_PASSWORD (Central Portal
 # user token; see build-logic/src/main/kotlin/uxcam-publishing.gradle.kts), optional
@@ -26,15 +19,14 @@
 name: Release
 
 on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (must match uxcamKmp in gradle/libs.versions.toml)"
+        description: "Existing release version to retry"
         required: true
-      publish_only:
-        description: "Retry Maven Central publishing only (tag and GitHub release already exist)"
-        type: boolean
-        default: false
 
 permissions: {}
 
@@ -44,7 +36,12 @@ concurrency:
 
 jobs:
   release:
-    name: Build, tag, and draft release
+    name: Build, tag, and publish release
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       startsWith(github.event.pull_request.head.ref, 'release/'))
     runs-on: macos-15
     timeout-minutes: 90
     permissions:
@@ -54,30 +51,58 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 1
-          # This job pushes the stamped Package.swift commit and the release tag.
+          # A fresh release is pinned to the reviewed merge commit. A retry is pinned to the
+          # existing immutable release tag.
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.event.pull_request.merge_commit_sha }}
           persist-credentials: true
 
-      - name: Validate version input
+      - name: Resolve release request
+        id: release
         env:
-          VERSION: ${{ inputs.version }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
+            version="${HEAD_BRANCH#release/}"
+            publish_only=false
+          else
+            version="$INPUT_VERSION"
+            publish_only=true
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish_only=$publish_only" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release request
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          VERSION: ${{ steps.release.outputs.version }}
+          PUBLISH_ONLY: ${{ steps.release.outputs.publish_only }}
         run: |
           if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::Version must be x.y.z, got '$VERSION'"
             exit 1
           fi
-          catalog="$(sed -n 's/^uxcamKmp = "\([^"]*\)".*$/\1/p' gradle/libs.versions.toml)"
-          if [[ "$catalog" != "$VERSION" ]]; then
-            echo "::error::uxcamKmp in libs.versions.toml is '$catalog', expected '$VERSION' — bump the catalog first"
-            exit 1
-          fi
-          if git ls-remote --exit-code origin "refs/tags/$VERSION" >/dev/null 2>&1; then
-            if [[ "${{ inputs.publish_only }}" != "true" ]]; then
-              echo "::error::Tag $VERSION already exists — existing tags are never changed. Re-run with publish_only to retry Maven Central."
+
+          if [[ "$PUBLISH_ONLY" == "true" ]]; then
+            if ! git ls-remote --exit-code origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+              echo "::error::publish-only retry requested but tag v$VERSION does not exist"
               exit 1
             fi
-            echo "Tag $VERSION exists; publish_only run — reusing it and skipping build/tag/release."
-          elif [[ "${{ inputs.publish_only }}" == "true" ]]; then
-            echo "::error::publish_only was requested but tag $VERSION does not exist"
+            echo "Tag v$VERSION exists; retrying publication without rebuilding or retagging."
+            exit 0
+          fi
+
+          if [[ "$HEAD_BRANCH" != "release/$VERSION" ]]; then
+            echo "::error::Release branch must be exactly release/$VERSION"
+            exit 1
+          fi
+          catalog="$(sed -n 's/^uxcamKmp = "\([^"]*\)".*$/\1/p' gradle/libs.versions.toml)"
+          if [[ "$catalog" != "$VERSION" ]]; then
+            echo "::error::uxcamKmp is '$catalog', but merged release branch requested '$VERSION'"
+            exit 1
+          fi
+          if git ls-remote --exit-code origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists — release tags are never moved"
             exit 1
           fi
 
@@ -88,7 +113,7 @@ jobs:
           java-version: "17"
 
       - name: Build UXCamKMP.xcframework.zip
-        if: inputs.publish_only != true
+        if: steps.release.outputs.publish_only != 'true'
         run: |
           ./gradlew :uxcam-kmp:assembleUXCamKMPXCFramework
           out="uxcam-kmp/build/XCFrameworks/release"
@@ -96,39 +121,37 @@ jobs:
           cp "$out/UXCamKMP.xcframework.zip" "$RUNNER_TEMP/UXCamKMP.xcframework.zip"
 
       - name: Stamp Package.swift
-        if: inputs.publish_only != true
-        id: stamp
+        if: steps.release.outputs.publish_only != 'true'
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
           checksum="$(swift package compute-checksum "$RUNNER_TEMP/UXCamKMP.xcframework.zip")"
           sed -i '' "s/^let version = \".*\"$/let version = \"$VERSION\"/" Package.swift
           sed -i '' "s/^let checksum = \".*\"$/let checksum = \"$checksum\"/" Package.swift
           swift package dump-package >/dev/null
-          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
 
-      - name: Commit, tag, and push
-        if: inputs.publish_only != true
+      - name: Create immutable release tag
+        if: steps.release.outputs.publish_only != 'true'
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
-          git config user.name "uxcam-release-bot"
+          git config user.name "mobile-uxcam"
           git config user.email "mobile@uxcam.com"
           git add Package.swift
           git commit -m "Release $VERSION"
-          git tag "$VERSION"
-          git push origin HEAD:main "refs/tags/$VERSION"
+          git tag "v$VERSION"
+          git push origin "refs/tags/v$VERSION"
 
       - name: Create draft GitHub release with the asset
-        if: inputs.publish_only != true
+        if: steps.release.outputs.publish_only != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
-          gh release create "$VERSION" \
+          gh release create "v$VERSION" \
             "$RUNNER_TEMP/UXCamKMP.xcframework.zip" \
             --draft \
-            --title "$VERSION" \
+            --title "v$VERSION" \
             --generate-notes
 
       - name: Stage, bundle, and upload to Maven Central
@@ -138,8 +161,6 @@ jobs:
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-          # Set repo variable MAVEN_CENTRAL_AUTO_PUBLISH=true to release without
-          # the manual Publish click. Left off until the flow is trusted.
           UXCAM_MAVEN_CENTRAL_AUTO_PUBLISH: ${{ vars.MAVEN_CENTRAL_AUTO_PUBLISH || 'false' }}
         run: |
           if [[ -z "$SIGNING_KEY" || -z "$OSSRH_USERNAME" ]]; then
@@ -156,29 +177,27 @@ jobs:
                     :uxcam-compose:publishAllPublicationsToCentralStagingRepository
           ./gradlew --no-configuration-cache -PuxcamStagingDir="$STAGING" \
                     -p gradle-plugin publishAllPublicationsToCentralStagingRepository
-          scripts/publish-central.sh "${{ inputs.version }}" "$STAGING"
+          scripts/publish-central.sh "${{ steps.release.outputs.version }}" "$STAGING"
 
       - name: Publish the GitHub release
-        if: vars.MAVEN_CENTRAL_AUTO_PUBLISH == 'true'
+        if: vars.MAVEN_PUBLISH_ENABLED == 'true' && vars.MAVEN_CENTRAL_AUTO_PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
-          # Auto-publish means the whole release is automated, not just the Central half —
-          # otherwise the GitHub release would sit as a draft while the artifacts are live.
-          if [[ "$(gh release view "$VERSION" --json isDraft --jq .isDraft)" == "true" ]]; then
-            gh release edit "$VERSION" --draft=false --latest
-            echo "Published GitHub release $VERSION"
+          if [[ "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" == "true" ]]; then
+            gh release edit "v$VERSION" --draft=false --latest
+            echo "Published GitHub release v$VERSION"
           else
-            echo "GitHub release $VERSION is already published."
+            echo "GitHub release v$VERSION is already published."
           fi
 
       - name: Notify Slack
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          VERSION: ${{ inputs.version }}
-          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}
-          AUTO_PUBLISH: ${{ vars.MAVEN_CENTRAL_AUTO_PUBLISH || 'false' }}
+          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.release.outputs.version }}
+          AUTO_PUBLISH: ${{ vars.MAVEN_PUBLISH_ENABLED == 'true' && vars.MAVEN_CENTRAL_AUTO_PUBLISH == 'true' }}
         run: |
           if [[ -z "$SLACK_WEBHOOK_URL" ]]; then
             echo "SLACK_WEBHOOK_URL is not configured; notification skipped."
@@ -189,7 +208,7 @@ jobs:
           else
             text=":package: UXCam KMP SDK $VERSION is staged and awaiting review — publish the GitHub draft ($RELEASE_URL) and the Central deployment (https://central.sonatype.com/publishing/deployments)"
           fi
-          jq -n --arg text "$text" '{text: $text}' \
+          jq -n --arg text "$text" '{text:$text}' \
             | curl --fail-with-body --retry 3 \
                 -H 'Content-Type: application/json' \
                 --data-binary @- \

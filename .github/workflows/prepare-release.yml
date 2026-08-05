@@ -1,0 +1,94 @@
+name: Prepare release branch
+
+on:
+  push:
+    branches:
+      - "release/**"
+
+permissions: {}
+
+concurrency:
+  group: prepare-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate and prepare release branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+
+      - name: Validate release branch
+        id: release
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if ! printf '%s' "$BRANCH" | grep -Eq '^release/[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Release branch must be named release/x.y.z, got '$BRANCH'"
+            exit 1
+          fi
+          version="${BRANCH#release/}"
+
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            echo "::error::$BRANCH must be created from the current main branch"
+            exit 1
+          fi
+
+          current="$(git show origin/main:gradle/libs.versions.toml | sed -n 's/^uxcamKmp = "\([^"]*\)".*$/\1/p')"
+          newest="$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -n 1)"
+          if [[ "$version" == "$current" || "$newest" != "$version" ]]; then
+            echo "::error::Release version $version must be newer than current version $current"
+            exit 1
+          fi
+          if git ls-remote --exit-code origin "refs/tags/v$version" >/dev/null 2>&1; then
+            echo "::error::Tag v$version already exists"
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Update release manifests
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          perl -0pi -e 's/^uxcamKmp = "[^"]+"/uxcamKmp = "$ENV{VERSION}"/m' gradle/libs.versions.toml
+          perl -0pi -e 's/^let version = ".*"$/let version = "0.0.0-unreleased"/m' Package.swift
+          grep -Fx "uxcamKmp = \"$VERSION\"" gradle/libs.versions.toml
+          grep -Fx 'let version = "0.0.0-unreleased"' Package.swift
+          git diff --check
+
+      - name: Commit prepared release
+        env:
+          BRANCH: ${{ github.ref_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          git config user.name "mobile-uxcam"
+          git config user.email "mobile@uxcam.com"
+          git add gradle/libs.versions.toml Package.swift
+          if git diff --cached --quiet; then
+            echo "Release manifests are already prepared for $VERSION."
+            exit 0
+          fi
+          git commit -m "Prepare release $VERSION"
+          git push origin "HEAD:refs/heads/$BRANCH"
+
+      - name: Add pull request link to summary
+        env:
+          BRANCH: ${{ github.ref_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          compare_url="https://github.com/$GITHUB_REPOSITORY/compare/main...$BRANCH?expand=1"
+          {
+            echo "## Release $VERSION prepared"
+            echo
+            echo "[Open the release pull request]($compare_url) and merge it after review."
+          } >> "$GITHUB_STEP_SUMMARY"
