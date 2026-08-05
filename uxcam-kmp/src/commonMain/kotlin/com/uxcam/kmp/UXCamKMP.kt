@@ -67,7 +67,6 @@ expect object UXCamKMP {
     // --- Occlusion (screen-level) ---
     fun occludeSensitiveScreen(hideScreen: Boolean)
     fun occludeSensitiveScreen(hideScreen: Boolean, withoutGesture: Boolean)
-    fun occludeAllTextFields(occludeAll: Boolean)
 
     /** Applies [overlayOcclusion] in addition to any occlusion rules already active. */
     fun applyOverlayOcclusion(overlayOcclusion: KMPUXCamOverlay)

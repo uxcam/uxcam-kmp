@@ -80,7 +80,6 @@ import com.uxcam.kmp.uxcamConfiguration
 
 UXCamKMP.startWithConfiguration(
     uxcamConfiguration("YOUR_UXCAM_APP_KEY") {
-        enableAutomaticScreenNameTagging = true
         enableCrashHandling = true
         occlusions = listOf(KMPUXCamBlur(screens = listOf("PaymentScreen")))
     }
@@ -91,7 +90,6 @@ UXCamKMP.logEvent("checkout_started", mapOf("cart_size" to 3))
 UXCamKMP.setUserIdentity("user-42")
 UXCamKMP.setSessionProperty("ab_bucket", "checkout_v2")
 UXCamKMP.reportBugEvent("payment_declined", mapOf("code" to 402))
-UXCamKMP.occludeAllTextFields(true)
 ```
 
 The common API covers the native surface shared by Android and iOS: session lifecycle, screen

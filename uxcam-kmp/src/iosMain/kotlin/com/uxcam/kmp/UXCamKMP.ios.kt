@@ -5,7 +5,6 @@ package com.uxcam.kmp
 import com.uxcam.kmp.cinterop.UXBlurType
 import com.uxcam.kmp.cinterop.UXCamBlurSetting
 import com.uxcam.kmp.cinterop.UXCamConfiguration as NativeUXCamConfiguration
-import com.uxcam.kmp.cinterop.UXCamOccludeAllTextFields
 import com.uxcam.kmp.cinterop.UXCamOcclusion
 import com.uxcam.kmp.cinterop.UXCamOcclusionSettingProtocol
 import com.uxcam.kmp.cinterop.UXCamOverlaySetting
@@ -55,21 +54,14 @@ actual object UXCamKMP {
         NativeUXCam.pluginType("kmp", version = UXCamKmpVersions.KMP)
 
         val native = NativeUXCamConfiguration(appKey = configuration.userAppKey)
-        native.enableAutomaticScreenNameTagging = configuration.enableAutomaticScreenNameTagging
+        native.enableAutomaticScreenNameTagging = false
         native.enableMultiSessionRecord = configuration.enableMultiSessionRecord
         native.enableCrashHandling = configuration.enableCrashHandling
         native.enableIntegrationLogging = configuration.enableIntegrationLogging
 
         val startupOcclusions = configuration.occlusions + pendingOcclusions.drain()
-        if (configuration.occludeAllTextFields || startupOcclusions.isNotEmpty()) {
+        if (startupOcclusions.isNotEmpty()) {
             val occlusion = UXCamOcclusion(settings = emptyList<UXCamOcclusionSettingProtocol>())
-            if (configuration.occludeAllTextFields) {
-                occlusion.applySettings(
-                    listOf(UXCamOccludeAllTextFields()),
-                    screens = emptyList<String>(),
-                    excludeMentionedScreens = false,
-                )
-            }
             startupOcclusions.forEach { rule ->
                 occlusion.applySettings(
                     listOf(rule.toNativeSetting()),
@@ -173,7 +165,6 @@ actual object UXCamKMP {
     actual fun occludeSensitiveScreen(hideScreen: Boolean) = NativeUXCam.occludeSensitiveScreen(hideScreen)
     actual fun occludeSensitiveScreen(hideScreen: Boolean, withoutGesture: Boolean) =
         NativeUXCam.occludeSensitiveScreen(hideScreen, hideGestures = withoutGesture)
-    actual fun occludeAllTextFields(occludeAll: Boolean) = NativeUXCam.occludeAllTextFields(occludeAll)
     actual fun applyOverlayOcclusion(overlayOcclusion: KMPUXCamOverlay) = applyOcclusionRule(overlayOcclusion)
     actual fun applyBlurOcclusion(blurOcclusion: KMPUXCamBlur) = applyOcclusionRule(blurOcclusion)
     actual fun removeOcclusion() {

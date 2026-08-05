@@ -21,7 +21,6 @@ import com.uxcam.kmp.sample.ui.Action
 import com.uxcam.kmp.sample.ui.ScreenScaffold
 import com.uxcam.kmp.sample.ui.Section
 import com.uxcam.kmp.sample.ui.ToggleRow
-import com.uxcam.kmp.setAutomaticScreenNameTagging
 import com.uxcam.kmp.setImprovedScreenCaptureEnabled
 
 @Composable
@@ -29,7 +28,6 @@ fun DebugScreen(navController: NavHostController) {
     var status by remember { mutableStateOf("") }
     var multiSession by remember { mutableStateOf(UXCamKMP.getMultiSessionRecord()) }
     var crashDisabled by remember { mutableStateOf(false) }
-    var autoTagging by remember { mutableStateOf(true) }
     var improvedCapture by remember { mutableStateOf(false) }
 
     ScreenScaffold {
@@ -101,11 +99,6 @@ fun DebugScreen(navController: NavHostController) {
                 crashDisabled = it
                 UXCamKMP.disableCrashHandling(it)
                 SampleLog.add("disableCrashHandling($it)")
-            }
-            ToggleRow("setAutomaticScreenNameTagging  — Android only", autoTagging) {
-                autoTagging = it
-                UXCamKMP.setAutomaticScreenNameTagging(it)
-                SampleLog.add("setAutomaticScreenNameTagging($it)")
             }
             ToggleRow("setImprovedScreenCaptureEnabled  — Android only", improvedCapture) {
                 improvedCapture = it

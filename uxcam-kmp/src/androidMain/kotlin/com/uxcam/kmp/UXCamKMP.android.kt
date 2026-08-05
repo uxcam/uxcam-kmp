@@ -33,7 +33,6 @@ actual object UXCamKMP {
         val startupOcclusions = configuration.occlusions.map { it.toNativeOcclusion() }
         NativeUXCam.startWithConfiguration(configuration.toNativeConfig(startupOcclusions))
         activeOcclusions.replaceWith(startupOcclusions)
-        if (configuration.occludeAllTextFields) NativeUXCam.occludeAllTextFields(true)
     }
 
     actual fun startWithKey(appKey: String) =
@@ -124,7 +123,6 @@ actual object UXCamKMP {
     actual fun occludeSensitiveScreen(hideScreen: Boolean) = NativeUXCam.occludeSensitiveScreen(hideScreen)
     actual fun occludeSensitiveScreen(hideScreen: Boolean, withoutGesture: Boolean) =
         NativeUXCam.occludeSensitiveScreen(hideScreen, withoutGesture)
-    actual fun occludeAllTextFields(occludeAll: Boolean) = NativeUXCam.occludeAllTextFields(occludeAll)
 
     actual fun applyOverlayOcclusion(overlayOcclusion: KMPUXCamOverlay) =
         applyOcclusion(overlayOcclusion.toNativeOcclusion())
@@ -212,7 +210,7 @@ private fun UXCamConfiguration.toNativeConfig(
     nativeOcclusions: List<NativeOcclusion>,
 ): NativeUXConfig =
     NativeUXConfig.Builder(userAppKey)
-        .enableAutomaticScreenNameTagging(enableAutomaticScreenNameTagging)
+        .enableAutomaticScreenNameTagging(false)
         .enableMultiSessionRecord(enableMultiSessionRecord)
         .enableCrashHandling(enableCrashHandling)
         .enableIntegrationLogging(enableIntegrationLogging)
