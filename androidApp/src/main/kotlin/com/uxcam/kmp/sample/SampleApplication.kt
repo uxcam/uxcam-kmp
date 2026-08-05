@@ -11,7 +11,6 @@ class SampleApplication : Application() {
         super.onCreate()
         UXCamKMP.startWithConfiguration(
             uxcamConfiguration(getString(R.string.uxcam_app_key)) {
-                enableAutomaticScreenNameTagging = true
                 enableCrashHandling = true
                 enableIntegrationLogging = true
                 // Startup occlusion is the only place iOS honours `excludeMentionedScreens`, so

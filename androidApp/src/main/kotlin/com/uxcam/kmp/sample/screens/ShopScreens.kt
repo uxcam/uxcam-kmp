@@ -19,7 +19,6 @@ import com.uxcam.kmp.sample.nav.productRoute
 import com.uxcam.kmp.sample.ui.Action
 import com.uxcam.kmp.sample.ui.ScreenScaffold
 import com.uxcam.kmp.sample.ui.Section
-import com.uxcam.kmp.sample.ui.ToggleRow
 import com.uxcam.kmp.uxcamOcclude
 
 private data class Product(val id: Int, val name: String, val price: String)
@@ -108,7 +107,6 @@ fun ProductScreen(navController: NavHostController, id: String) {
 fun CheckoutScreen() {
     var cardNumber by remember { mutableStateOf("4242 4242 4242 4242") }
     var cvv by remember { mutableStateOf("123") }
-    var occludeFields by remember { mutableStateOf(false) }
 
     ScreenScaffold {
         Section("Payment details", "Both fields below are occluded per-composable.") {
@@ -128,11 +126,6 @@ fun CheckoutScreen() {
                     .fillMaxWidth()
                     .uxcamOcclude("checkout-cvv"),
             )
-            ToggleRow("occludeAllTextFields", occludeFields) {
-                occludeFields = it
-                UXCamKMP.occludeAllTextFields(it)
-                SampleLog.add("occludeAllTextFields($it)")
-            }
         }
 
         Section(

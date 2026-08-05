@@ -8,9 +8,6 @@ import com.uxcam.UXCam as NativeUXCam
  */
 fun UXCamKMP.markSessionAsFavorite() = NativeUXCam.markSessionAsFavorite()
 
-fun UXCamKMP.setAutomaticScreenNameTagging(enable: Boolean) =
-    NativeUXCam.setAutomaticScreenNameTagging(enable)
-
 fun UXCamKMP.setImprovedScreenCaptureEnabled(enable: Boolean) =
     NativeUXCam.setImprovedScreenCaptureEnabled(enable)
 

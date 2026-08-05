@@ -5,11 +5,9 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 data class UXCamConfiguration(
     val userAppKey: String,
-    val enableAutomaticScreenNameTagging: Boolean = true,
     val enableMultiSessionRecord: Boolean = true,
     val enableCrashHandling: Boolean = true,
     val enableIntegrationLogging: Boolean = false,
-    val occludeAllTextFields: Boolean = false,
     val occlusions: List<Occlusion> = emptyList(),
 ) {
     init {
@@ -22,19 +20,15 @@ data class UXCamConfiguration(
 class UXCamConfigurationBuilder(appKey: String) {
     private val defaults = UXCamConfiguration(appKey)
 
-    var enableAutomaticScreenNameTagging: Boolean = defaults.enableAutomaticScreenNameTagging
     var enableMultiSessionRecord: Boolean = defaults.enableMultiSessionRecord
     var enableCrashHandling: Boolean = defaults.enableCrashHandling
     var enableIntegrationLogging: Boolean = defaults.enableIntegrationLogging
-    var occludeAllTextFields: Boolean = defaults.occludeAllTextFields
     var occlusions: List<Occlusion> = defaults.occlusions
 
     fun build(): UXCamConfiguration = defaults.copy(
-        enableAutomaticScreenNameTagging = enableAutomaticScreenNameTagging,
         enableMultiSessionRecord = enableMultiSessionRecord,
         enableCrashHandling = enableCrashHandling,
         enableIntegrationLogging = enableIntegrationLogging,
-        occludeAllTextFields = occludeAllTextFields,
         occlusions = occlusions,
     )
 }

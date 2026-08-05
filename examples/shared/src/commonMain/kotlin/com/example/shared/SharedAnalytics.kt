@@ -8,7 +8,6 @@ import com.uxcam.kmp.uxcamConfiguration
 object SharedAnalytics {
     fun start(appKey: String) = UXCamKMP.startWithConfiguration(
         uxcamConfiguration(appKey) {
-            enableAutomaticScreenNameTagging = true
             enableCrashHandling = true
             // Startup occlusion rules work on both platforms (and are the only way
             // excludeMentionedScreens is honoured on iOS).
