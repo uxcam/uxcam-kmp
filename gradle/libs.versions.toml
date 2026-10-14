@@ -7,12 +7,12 @@ androidTargetSdk = "35"
 
 # Single source of truth — the published uxcam-kmp version and the native UXCam SDK versions.
 # Consumed by the library build, and code-generated into the Gradle plugin (see gradle-plugin/build.gradle.kts).
-uxcamKmp = "1.0.0"
-uxcamAndroid = "3.10.7"
-uxcamIos = "3.10.0"
+uxcamKmp = "1.0.1"
+uxcamAndroid = "3.11.2"
+uxcamIos = "3.11.1"
 # SHA-256 of UXCam.xcframework.zip for uxcamIos — verified at download time (see uxcam-kmp/build.gradle.kts).
 # Matches the checksum upstream declares in uxcam-ios/Package.swift for the same release asset.
-uxcamIosChecksum = "492517f73765d2ba2ef59712a3310bb8824a6cc503b9af19050a14c2b1902dca"
+uxcamIosChecksum = "9848903f64b7bbdfbd9caf7c29b3ac04d66c1a9c1c58719ad9a63f40e56137cb"
 
 coreKtx = "1.13.1"
 lifecycle = "2.8.7"

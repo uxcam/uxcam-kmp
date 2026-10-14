@@ -21,7 +21,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/uxcam/uxcam-ios", exact: "3.10.0")
+        .package(url: "https://github.com/uxcam/uxcam-ios", exact: "3.11.1")
     ],
     targets: [
         .binaryTarget(
