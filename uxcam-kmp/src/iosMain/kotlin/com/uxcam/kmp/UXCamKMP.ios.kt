@@ -58,6 +58,7 @@ actual object UXCamKMP {
         native.enableMultiSessionRecord = configuration.enableMultiSessionRecord
         native.enableCrashHandling = configuration.enableCrashHandling
         native.enableIntegrationLogging = configuration.enableIntegrationLogging
+        native.enableImprovedWebViewCapture = configuration.enableImprovedWebViewCapture
 
         val startupOcclusions = configuration.occlusions + pendingOcclusions.drain()
         if (startupOcclusions.isNotEmpty()) {

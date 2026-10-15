@@ -9,6 +9,7 @@ data class UXCamConfiguration(
     val enableCrashHandling: Boolean = true,
     val enableIntegrationLogging: Boolean = false,
     val occlusions: List<Occlusion> = emptyList(),
+    val enableImprovedWebViewCapture: Boolean = false,
 ) {
     init {
         require(userAppKey.isNotBlank()) { "UXCam app key must not be blank" }
@@ -24,12 +25,14 @@ class UXCamConfigurationBuilder(appKey: String) {
     var enableCrashHandling: Boolean = defaults.enableCrashHandling
     var enableIntegrationLogging: Boolean = defaults.enableIntegrationLogging
     var occlusions: List<Occlusion> = defaults.occlusions
+    var enableImprovedWebViewCapture: Boolean = defaults.enableImprovedWebViewCapture
 
     fun build(): UXCamConfiguration = defaults.copy(
         enableMultiSessionRecord = enableMultiSessionRecord,
         enableCrashHandling = enableCrashHandling,
         enableIntegrationLogging = enableIntegrationLogging,
         occlusions = occlusions,
+        enableImprovedWebViewCapture = enableImprovedWebViewCapture,
     )
 }
 
