@@ -26,7 +26,7 @@ dependencyResolutionManagement {
         mavenCentral()
         // Serves the UXCam iOS XCFramework zip as a resolvable artifact. The pattern maps
         // `com.uxcam.ios:UXCam:<version>@zip` to the GitHub release zip, e.g.
-        // .../uxcam-ios/releases/download/3.10.0/UXCam.xcframework.zip. Scoped to the
+        // .../uxcam-ios/releases/download/3.11.1/UXCam.xcframework.zip. Scoped to the
         // com.uxcam.ios group only. The SDK moved from the now-archived `uxcam-ios-sdk` repo
         // (zip committed in-tree) to `uxcam-ios`, which publishes it as a release asset —
         // hence the different host and path.

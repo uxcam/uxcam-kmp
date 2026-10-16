@@ -214,6 +214,7 @@ private fun UXCamConfiguration.toNativeConfig(
         .enableMultiSessionRecord(enableMultiSessionRecord)
         .enableCrashHandling(enableCrashHandling)
         .enableIntegrationLogging(enableIntegrationLogging)
+        .enableImprovedWebViewCapture(enableImprovedWebViewCapture)
         .apply {
             if (nativeOcclusions.isNotEmpty()) {
                 occlusions(nativeOcclusions)

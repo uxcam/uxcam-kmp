@@ -8,7 +8,7 @@ options:
 packages:
   UXCam:
     url: https://github.com/uxcam/uxcam-ios
-    exactVersion: 3.10.0
+    exactVersion: 3.11.1
 
 targets:
   iosApp:
